@@ -12,6 +12,7 @@ interface ExtrudedArgs {
 interface AllCountriesArgs {
 	thickness: number;
 	colorful: boolean;
+	resolution: number;
 }
 
 const meta: Meta<ExtrudedArgs> = {
@@ -69,13 +70,16 @@ export const Default: Story = {
 };
 
 export const AllCountries: StoryObj<AllCountriesArgs> = {
+	name: 'All Countries (Globe)',
 	argTypes: {
-		thickness: { control: { type: 'range', min: 0, max: 5, step: 0.1 } },
+		thickness: { control: { type: 'range', min: 0, max: 200000, step: 5000 } },
 		colorful: { control: 'boolean' },
+		resolution: { control: { type: 'range', min: 1, max: 10, step: 0.5 } },
 	},
 	args: {
-		thickness: 1,
+		thickness: 50000,
 		colorful: true,
+		resolution: 2.5,
 	},
 	render: ( args ) => {
 
@@ -84,8 +88,22 @@ export const AllCountries: StoryObj<AllCountriesArgs> = {
 		container.style.height = '100vh';
 
 		const { group, controls, cleanup } = createThreeScene( container );
+		group.rotation.x = - Math.PI / 2;
 		controls.autoRotate = true;
 		controls.autoRotateSpeed = 0.5;
+
+		// Add globe base
+		const globeBase = new Mesh(
+			new SphereGeometry( 1, 100, 50 ),
+			new MeshStandardMaterial( {
+				color: 0x111111,
+				transparent: true,
+				opacity: 0.9,
+				depthWrite: false,
+			} )
+		);
+		globeBase.scale.copy( WGS84_ELLIPSOID.radius );
+		group.add( globeBase );
 
 		// Load GeoJSON
 		fetch( new URL( '../example/world.geojson', import.meta.url ).href )
@@ -106,8 +124,16 @@ export const AllCountries: StoryObj<AllCountriesArgs> = {
 					.flatMap( f => f.polygons )
 					.forEach( geom => {
 
-						const mesh = geom.getMeshObject( { thickness: args.thickness } );
-						const material = new MeshStandardMaterial();
+						const mesh = geom.getMeshObject( {
+							thickness: args.thickness,
+							ellipsoid: WGS84_ELLIPSOID,
+							resolution: args.resolution,
+						} );
+						const material = new MeshStandardMaterial( {
+							polygonOffset: true,
+							polygonOffsetFactor: - 1,
+							polygonOffsetUnits: - 1,
+						} );
 
 						if ( args.colorful ) {
 
@@ -121,7 +147,7 @@ export const AllCountries: StoryObj<AllCountriesArgs> = {
 
 					} );
 
-				centerAndScaleGroup( group );
+				centerAndScaleGroup( group, 1.5 );
 
 			} );
 
